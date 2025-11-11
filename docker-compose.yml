@@ -1,0 +1,5 @@
+include:
+  - services/redis.yml
+  - services/rabbitmq.yml
+  - services/kafka.yml
+  - services/tests_data_source.yml
