@@ -1,34 +1,61 @@
 @startuml C2_Container
-!include plantuml/C4-PlantUML/C4_Container.puml
-title Container Diagram for Data Processing System
-Person(client, "Client", "User accessing the system via API")
-System_Boundary(c1, "Data Processing System") {
-Container(webapp, "Web-App", "API Server", "Handles API requests, caching, and scheduling crawls")
-Container(crawls, "Crawls Service", "Consumer", "Crawls data and stores in DataLake")
-Container(scoring, "Scoring Service", "Consumer", "Processes data and updates DB/Cache")
-ContainerDb(redis, "Redis", "Cache", "Caching layer")
-ContainerDb(postgres, "PostgreSQL", "Database", "Persistent storage")
-ContainerDb(mongo, "MongoDB", "DataLake", "Stores crawled data")
-ContainerQueue(kafka, "Kafka", "Message Broker", "For scheduling crawls and scoring")
-ContainerQueue(rabbitmq, "RabbitMQ", "Message Broker", "For error handling with delays")
+!define C4P ./plantuml/C4-PlantUML
+!include C4P/C4_Container.puml
+
+skinparam linetype ortho, polyline
+skinparam defaultTextAlignment center
+skinparam dpi 150
+
+
+title : Scoring Data System (C4-L2 - Container Diagram)
+AddRelTag("External Connect", $textColor=$ARROW_FONT_COLOR, $lineColor=$ARROW_COLOR, $lineStyle=DottedLine())
+AddRelTag("Error handler error push back", $textColor="Red", $lineColor="Red")
+AddRelTag("Cache Stuff", $textColor="Green", $lineColor="Green")
+AddRelTag("Database Access", $textColor="Orange", $lineColor="Orange")
+AddRelTag("Kafka Stuff", $textColor="Blue", $lineColor="Blue")
+
+Person(client, "Client", "Người dùng hoặc hệ thống gọi API để lấy dữ liệu tổng hợp")
+System_Boundary(dbs, "Databases") {
+        ContainerDb(postgres, "PostgreSQL", "Relational Database", "Lưu kết quả tính toán cuối cùng")
+        ContainerDb(datalake, "DataLake", "MongoDB", "Lưu trữ dữ liệu thô từ Crawlers")
+   }
+System_Boundary(scs, "Scoring System") {
+    Container(web, "Web Service", "FastAPI", "Cung cấp REST API cho Client. Đọc cache/DB, gửi lệnh Crawl hoặc Scoring qua Kafka.")
+    Container(crawler, "Crawlers Service", "Python + Playwright / Scrapy", "Nhận message Crawl, thu thập dữ liệu từ các nguồn ngoài, lưu vào Datalake, gửi lỗi qua RabbitMQ.")
+    Container(scoring, "Scoring Service", "Python", "Lắng nghe Kafka, đọc Datalake, tính toán điểm, lưu kết quả vào PostgreSQL và Redis.")
 }
-System_Ext(ecommerce, "E-commerce Platforms", "Lazada, Tiki")
-System_Ext(social, "Social Media", "Facebook, Twitter")
-System_Ext(bank, "Bank Systems", "Transaction history")
-Rel(client, webapp, "API calls", "Retrieves data")
-Rel(webapp, redis, "Checks cache first")
-Rel(webapp, postgres, "Fetches if not in cache")
-Rel(webapp, redis, "Syncs back to cache")
-Rel(webapp, kafka, "Sends crawl schedules")
-Rel(crawls, kafka, "Listens to")
-Rel(crawls, ecommerce, "Crawls")
-Rel(crawls, social, "Crawls")
-Rel(crawls, bank, "Crawls")
-Rel(crawls, mongo, "Stores to DataLake")
-Rel(crawls, rabbitmq, "Sends errors with delay")
-Rel(crawls, kafka, "Possibly triggers scoring?") // Assuming some flow
-Rel(scoring, kafka, "Listens to")
-Rel(scoring, mongo, "Retrieves from DataLake")
-Rel(scoring, postgres, "Upserts to")
-Rel(scoring, redis, "Upserts to")
+
+System_Boundary(eventbus, "Message Bus") {
+    Container(kafka, "Kafka", "Message Broker", "Trung gian gửi message giữa Web-App, Crawler và Scoring")
+    Container(rabbit, "RabbitMQ", "Message Queue", "*Nhận lỗi xử lý từ Consumers \n*Hỗ trợ delayed retry \n*Quy trình như Dead-letter Queue")
+}
+
+System_Boundary(cache, "Caches"){
+    ContainerDb(redis, "Redis", "In-memory Cache", "Cache dữ liệu và kết quả tính toán")
+}
+
+System_Boundary(sb2, "Targeted Sites") {
+    System_Ext(ecommerce, "Sàn TMĐT", "Lazada / Tiki")
+    System_Ext(social, "Mạng xã hội", "Facebook / Twitter")
+    System_Ext(bank, "Ngân hàng", "Cung cấp dữ liệu giao dịch")
+}
+Rel_D(client, web, "Truy vấn", $tags="External Connect")
+Rel(web, postgres, "Truy vấn DB", $tags="Database Access")
+
+"crawler" ...left.....> "sb2": "Thu thập dữ liệu",
+
+Rel(crawler, datalake, "Insert data", $tags="Kafka Stuff")
+Rel(crawler, kafka, "Subscribes", $tags="Kafka Stuff")
+Rel(scoring, kafka, "Subscribes", $tags="Kafka Stuff")
+Rel(web, kafka, "Publish Mesage", $tags="Kafka Stuff")
+Rel(scoring, datalake, "Reads data lake")
+
+Rel(web, redis, "Cache Stuff", $tags="Cache Stuff")
+Rel(crawler, rabbit, "", $tags="Error handler error push back")
+Rel(scoring, rabbit, "", $tags="Error handler error push back")
+Rel(web, rabbit, "", $tags="Error handler error push back")
+
+Rel(scoring, postgres, "Upsert", $tags="Database Access")
+Rel_D(scoring, redis, "Upsert", $tags="Cache Stuff")
+SHOW_LEGEND()
 @enduml
