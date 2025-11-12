@@ -1,44 +1,38 @@
 @startuml C1_Context
-!include ./plantuml/C4-PlantUML/C4_Context.puml
 
-title C1 - System Context: Crawl & Scoring Data System
+!define C4P ./plantuml/C4-PlantUML
+!include C4P/C4_Deployment.puml
+skinparam linetype ortho, polyline
+skinparam defaultTextAlignment center
+skinparam dpi 150
 
-' Người dùng hệ thống
-Person(client, "Client", "Gọi API Web-App để lấy dữ liệu tổng hợp")
 
-' Hệ thống chính
-System(webapp, "Web-App API", "Cung cấp API cho client, truy xuất cache/DB, gửi dữ liệu/lệnh crawl qua Kafka")
-System(crawl, "Crawl Service", "Lắng nghe Kafka, thu thập dữ liệu từ các sàn thương mại, mạng xã hội, ngân hàng, lưu Datalake, gửi lỗi RabbitMQ")
-System(calculate, "Scoring Service", "Lắng nghe Kafka, truy xuất Datalake, tính toán, upsert kết quả vào PostgreSQL và Redis")
+title Scoring Data System. (System Context C4-L1)
+AddRelTag("external connect", $textColor=$ARROW_FONT_COLOR, $lineColor=$ARROW_COLOR, $lineStyle=DottedLine())
 
-' Hệ thống bên ngoài / dịch vụ phụ trợ
-System_Ext(ecommerce, "Lazada / Tiki", "Sàn thương mại điện tử")
-System_Ext(social, "Facebook / Twitter", "Mạng xã hội")
-System_Ext(bank, "Ngân hàng", "Cung cấp dữ liệu giao dịch")
-System_Ext(datalake, "MongoDB", "Lưu dữ liệu thô")
-System_Ext(db, "PostgreSQL", "Lưu kết quả tính toán")
-System_Ext(cache, "Redis", "Cache dữ liệu nhanh")
-System_Ext(kafka, "Kafka", "Message Broker gửi lệnh crawl / dữ liệu lịch sử")
-System_Ext(rabbit, "RabbitMQ", "Nhận thông báo lỗi từ Crawl Service")
+Person(client, "Client", "Truy cập  API Web-App để lấy dữ liệu tổng hợp")
 
-' Quan hệ chính
-Rel(client, webapp, "Gọi API lấy dữ liệu")
-Rel(webapp, cache, "Đọc dữ liệu cache")
-Rel(webapp, db, "Truy vấn dữ liệu nếu cache trống")
-Rel(webapp, cache, "Đồng bộ dữ liệu sau DB")
-Rel(webapp, kafka, "Gửi lệnh crawl / dữ liệu lịch sử")
+System_Boundary(svc, "Scoring Service") {
+    System(calculate, "Scoring Systems", "*Truy xuất và trả kết quả.\n*Crawls.\n*Tính toán.")
+}
 
-Rel(crawl, ecommerce, "Crawl dữ liệu")
-Rel(crawl, social, "Crawl dữ liệu")
-Rel(crawl, bank, "Crawl dữ liệu / lịch sử giao dịch")
-Rel(crawl, datalake, "Lưu dữ liệu thô")
-Rel(crawl, rabbit, "Gửi lỗi xử lý với delayed time")
+System_Boundary(dbs, "Databases") {
+    System(db, "PostgreSQL", "Lưu trữ kết quả")
+}
 
-Rel(calculate, datalake, "Đọc dữ liệu thô")
-Rel(calculate, db, "Upsert kết quả tính toán")
-Rel(calculate, cache, "Upsert cache kết quả")
+System_Boundary(sb2, "External Systems") {
+    System_Ext(ecommerce, "Sàn thương mại điện tử", "Lazada / Tiki")
+    System_Ext(social, "Mạng xã hội", "Facebook / Twitter")
+    System_Ext(bank, "Ngân hàng", "Dữ liệu giao dịch")
+}
 
-Rel(kafka, calculate, "Gửi lệnh Tính Toán")
-Rel(kafka, crawl, "Gửi lệnh Tính Toán")
+System_Boundary(cache, "Cache") {
+    System(redis, "Redis", "Cache dữ liệu")
+}
 
+Rel_D(client, svc, "Gọi API", $tags="external connect" )
+Rel_D(svc, dbs, "Đọc/ghi dữ liệu DB")
+Rel_D(svc, cache, "Cache Data")
+Rel_R(svc, sb2, "Crawl dữ liệu", $tags="external connect")
+LAYOUT_WITH_LEGEND()
 @enduml
