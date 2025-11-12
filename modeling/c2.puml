@@ -1,0 +1,34 @@
+@startuml C2_Container
+!include plantuml/C4-PlantUML/C4_Container.puml
+title Container Diagram for Data Processing System
+Person(client, "Client", "User accessing the system via API")
+System_Boundary(c1, "Data Processing System") {
+Container(webapp, "Web-App", "API Server", "Handles API requests, caching, and scheduling crawls")
+Container(crawls, "Crawls Service", "Consumer", "Crawls data and stores in DataLake")
+Container(scoring, "Scoring Service", "Consumer", "Processes data and updates DB/Cache")
+ContainerDb(redis, "Redis", "Cache", "Caching layer")
+ContainerDb(postgres, "PostgreSQL", "Database", "Persistent storage")
+ContainerDb(mongo, "MongoDB", "DataLake", "Stores crawled data")
+ContainerQueue(kafka, "Kafka", "Message Broker", "For scheduling crawls and scoring")
+ContainerQueue(rabbitmq, "RabbitMQ", "Message Broker", "For error handling with delays")
+}
+System_Ext(ecommerce, "E-commerce Platforms", "Lazada, Tiki")
+System_Ext(social, "Social Media", "Facebook, Twitter")
+System_Ext(bank, "Bank Systems", "Transaction history")
+Rel(client, webapp, "API calls", "Retrieves data")
+Rel(webapp, redis, "Checks cache first")
+Rel(webapp, postgres, "Fetches if not in cache")
+Rel(webapp, redis, "Syncs back to cache")
+Rel(webapp, kafka, "Sends crawl schedules")
+Rel(crawls, kafka, "Listens to")
+Rel(crawls, ecommerce, "Crawls")
+Rel(crawls, social, "Crawls")
+Rel(crawls, bank, "Crawls")
+Rel(crawls, mongo, "Stores to DataLake")
+Rel(crawls, rabbitmq, "Sends errors with delay")
+Rel(crawls, kafka, "Possibly triggers scoring?") // Assuming some flow
+Rel(scoring, kafka, "Listens to")
+Rel(scoring, mongo, "Retrieves from DataLake")
+Rel(scoring, postgres, "Upserts to")
+Rel(scoring, redis, "Upserts to")
+@enduml

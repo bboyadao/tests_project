@@ -1,0 +1,44 @@
+@startuml C1_Context
+!include ./plantuml/C4-PlantUML/C4_Context.puml
+
+title C1 - System Context: Crawl & Scoring Data System
+
+' Người dùng hệ thống
+Person(client, "Client", "Gọi API Web-App để lấy dữ liệu tổng hợp")
+
+' Hệ thống chính
+System(webapp, "Web-App API", "Cung cấp API cho client, truy xuất cache/DB, gửi dữ liệu/lệnh crawl qua Kafka")
+System(crawl, "Crawl Service", "Lắng nghe Kafka, thu thập dữ liệu từ các sàn thương mại, mạng xã hội, ngân hàng, lưu Datalake, gửi lỗi RabbitMQ")
+System(calculate, "Scoring Service", "Lắng nghe Kafka, truy xuất Datalake, tính toán, upsert kết quả vào PostgreSQL và Redis")
+
+' Hệ thống bên ngoài / dịch vụ phụ trợ
+System_Ext(ecommerce, "Lazada / Tiki", "Sàn thương mại điện tử")
+System_Ext(social, "Facebook / Twitter", "Mạng xã hội")
+System_Ext(bank, "Ngân hàng", "Cung cấp dữ liệu giao dịch")
+System_Ext(datalake, "MongoDB", "Lưu dữ liệu thô")
+System_Ext(db, "PostgreSQL", "Lưu kết quả tính toán")
+System_Ext(cache, "Redis", "Cache dữ liệu nhanh")
+System_Ext(kafka, "Kafka", "Message Broker gửi lệnh crawl / dữ liệu lịch sử")
+System_Ext(rabbit, "RabbitMQ", "Nhận thông báo lỗi từ Crawl Service")
+
+' Quan hệ chính
+Rel(client, webapp, "Gọi API lấy dữ liệu")
+Rel(webapp, cache, "Đọc dữ liệu cache")
+Rel(webapp, db, "Truy vấn dữ liệu nếu cache trống")
+Rel(webapp, cache, "Đồng bộ dữ liệu sau DB")
+Rel(webapp, kafka, "Gửi lệnh crawl / dữ liệu lịch sử")
+
+Rel(crawl, ecommerce, "Crawl dữ liệu")
+Rel(crawl, social, "Crawl dữ liệu")
+Rel(crawl, bank, "Crawl dữ liệu / lịch sử giao dịch")
+Rel(crawl, datalake, "Lưu dữ liệu thô")
+Rel(crawl, rabbit, "Gửi lỗi xử lý với delayed time")
+
+Rel(calculate, datalake, "Đọc dữ liệu thô")
+Rel(calculate, db, "Upsert kết quả tính toán")
+Rel(calculate, cache, "Upsert cache kết quả")
+
+Rel(kafka, calculate, "Gửi lệnh Tính Toán")
+Rel(kafka, crawl, "Gửi lệnh Tính Toán")
+
+@enduml

@@ -1,0 +1,23 @@
+@startuml C3_Component_WebApp
+!define C4P ./plantuml/C4-PlantUML
+!include C4P/C4_Context.puml
+!include C4P/C4_Component.puml
+'!include C4P/themes/puml-theme-C4_united.puml
+
+title C3 - Component Diagram: Web-App / API
+
+Container(webapp, "Web-App API", "FastAPI / Flask", "Cung cấp REST API cho client")
+
+Component(controller, "APIController", "REST Controller", "Xử lý request từ client")
+Component(service, "DataService", "Service", "Logic lấy dữ liệu, cache, DB")
+Component(cacheClient, "Redis Client", "Cache Client", "Đọc / ghi dữ liệu Redis")
+Component(repo, "DataRepository", "PostgreSQL Repository", "Truy vấn / Upsert dữ liệu DB")
+Component(kafkaClient, "KafkaProducer", "Kafka Client", "Gửi lệnh crawl / scoring")
+
+Rel(controller, service, "Gọi logic xử lý dữ liệu")
+Rel(service, cacheClient, "Kiểm tra dữ liệu cache")
+Rel(service, repo, "Truy vấn DB nếu cache trống")
+Rel(service, cacheClient, "Đồng bộ cache sau DB")
+Rel(service, kafkaClient, "Gửi lệnh crawl / scoring")
+
+@enduml
