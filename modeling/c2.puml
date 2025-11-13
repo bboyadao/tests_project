@@ -4,8 +4,7 @@
 
 skinparam linetype ortho, polyline
 skinparam defaultTextAlignment center
-skinparam dpi 150
-
+skinparam dpi 240
 
 title : Scoring Data System (C4-L2 - Container Diagram)
 AddRelTag("External Connect", $textColor=$ARROW_FONT_COLOR, $lineColor=$ARROW_COLOR, $lineStyle=DottedLine())
@@ -57,5 +56,6 @@ Rel(web, rabbit, "", $tags="Error handler error push back")
 
 Rel(scoring, postgres, "Upsert", $tags="Database Access")
 Rel_D(scoring, redis, "Upsert", $tags="Cache Stuff")
+
 SHOW_LEGEND()
 @enduml

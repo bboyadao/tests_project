@@ -1,60 +1,102 @@
-@startuml C3_Component_WebApp
+@startuml C3_Component_ScoringSystem
 !define C4P ./plantuml/C4-PlantUML
 !include C4P/C4_Context.puml
 !include C4P/C4_Component.puml
 !include C4P/C4_Container.puml
-title Scoring System (C4-L3 Component)
+skinparam linetype ortho, polyline
+skinparam defaultTextAlignment center
+skinparam dpi 240
 
-System_Boundary(ext, "Message Bus") {
-    System(kafka, "Kafka Cluster", "Hệ thống streaming / pub-sub broker")
-    System(rabbit, "RabbitMq Cluster", "Hàng đợi tin nhắn / pub-sub broker")
+title Scoring Data System (C4-L3 - Component Diagram)
+
+AddRelTag("External Connect", $textColor=$ARROW_FONT_COLOR, $lineColor=$ARROW_COLOR, $lineStyle=DottedLine())
+AddRelTag("Cache Access", $textColor="Green", $lineColor="Green")
+AddRelTag("Database Access", $textColor="Orange", $lineColor="Orange")
+AddRelTag("Kafka Stuff", $textColor="Blue", $lineColor="Blue")
+AddRelTag("Error Queue", $textColor="Red", $lineColor="Red")
+
+'=== EXTERNAL SYSTEMS ===
+
+System_Boundary(target, "Targeted") {
+    System_Ext(ecommerce, "Sàn TMĐT", "Lazada / Tiki")
+    System_Ext(social, "Mạng xã hội", "Facebook / Twitter")
+    System_Ext(bank, "Ngân hàng", "Cung cấp dữ liệu giao dịch")
 }
 
-System_Boundary(dbs, "DataBases") {
-    System(postgres, "PostgreSQL", "Cơ sở dữ liệu quan hệ dùng để lưu trữ dữ liệu lâu dài")
-    System(datalake, "Datalake", "Cơ sở dữ liệu phi quan hệ, lưu trữ dữ liệu thô")
+'=== INTERNAL SYSTEMS ===
+Boundary(needed_service, "Needed Services") {
+    Boundary(bus, "Message Bus") {
+        System(kafka, "Kafka Cluster", "*Pub/Sub Broker\n*Trung gian gửi message giữa Web Service, Crawler Service và Scoring Service")
+        System(rabbit, "RabbitMQ Cluster", "*Message Queue\n*Nhận lỗi xử lý từ Consumers\n*Hỗ trợ delayed retry và DLQ")
+    }
+
+    Boundary(dbs, "Databases") {
+        ContainerDb(postgres, "PostgreSQL", "Clusters", "*Relational Database\nLưu kết quả tính toán cuối cùng")
+        ContainerDb(datalake, "DataLake", "Clusters", "*Document Store\nLưu dữ liệu thô từ Crawlers")
+    }
+
+    Boundary(cache, "Caches") {
+        System(redis, "Redis", "*In-memory Cache\n*Cache dữ liệu kết quả tính toán")
+    }
 }
 
-System_Boundary(cache, "Caches") {
-    System(redis, "Redis", "Bộ nhớ đệm trong RAM, hỗ trợ truy xuất nhanh")
+'=== 1. WEB SERVICE (API Layer) ===
+System_Boundary(web, "Web Service") {
+    Person(client, "Client", "Người dùng hoặc hệ thống gọi API")
+    Component(api_router, "API Router", "FastAPI Router", "*Xử lý routing HTTP")
+    Component(auth_middleware, "Auth Middleware", "JWT / OAuth2 Middleware", "*Xác thực token và phân quyền người dùng")
+    Component(service_layer, "Service Layer", "Business Logic", "*Thực thi use-case, điều phối giữa cache, repo, kafka")
+    Component(repo_postgres, "PostgreSQL Repository", "Async DB Access", "*Đọc/ghi dữ liệu vào PostgreSQL")
+    Component(cache_redis, "Redis Adapter\nCache Layer", "Async Access", "*Đọc/ghi cache, hỗ trợ read-through")
+    Component(kafka_producer, "Kafka Producer", "Event Publisher", "*Gửi sự kiện Crawl / Scoring lên Kafka")
+    Component(rabbit_error_pub, "Error Publisher", "Error Handling", "*Gửi lỗi xử lý sang RabbitMQ")
 }
 
-Person(client, "Client", "Gọi API Web-App để lấy dữ liệu tổng hợp")
-
-System_Boundary(c1, "Web Services") {
-    Component(api_router, "API Router", "HTTP routing", "Phân tích request HTTP, kiểm tra dữ liệu đầu vào và chuyển tiếp đến middleware hoặc service")
-    Component(auth_middleware, "Auth Middleware", "Authn/Authz", "Xác thực token, trích xuất danh tính và kiểm soát tốc độ truy cập")
-    Component(service_layer, "Service Layer", "Application logic", "Thực thi các use-case, điều phối cache, repository và việc gửi sự kiện")
-    Component(repo_postgres, "PostgreSQL Repository", "Data access layer", "Đọc/ghi dữ liệu vào PostgreSQL thông qua driver bất đồng bộ")
-    Component(cache_redis, "Redis Cache Adapter", "Cache layer", "Cung cấp thao tác get/set, hỗ trợ cơ chế đọc trực tiếp từ cache (read-through)")
-    Component(kafka_producer, "Kafka Producer", "Event publisher", "Gửi sự kiện miền (domain events) lên các topic Kafka một cách bất đồng bộ")
-    Component(background_worker, "Background Worker", "Async worker", "Xử lý lại các lần gửi thất bại, hoặc các tác vụ chạy nền (không đồng bộ)")
+'=== 2. CRAWLER SERVICE ===
+System_Boundary(crawler, "Crawler Service") {
+    Component(crawl_consumer, "Crawlers", "Kafka Consumer", "*Nhận lệnh Crawl từ Kafka topic\n*Thu thập dữ liệu từ các nguồn TMĐT / MXH / Ngân hàng\n*Lưu dữ liệu thô vào DataLake\n*Gửi lỗi crawl / retry lại")
 }
 
-System_Boundary(sc, "Scoring Services") {
-    Component(sc1, "Stream Process Score", "HTTP", "Trả kết quả điểm số trực tiếp thông qua HTTP")
-    Component(sc2, "Stream Process Score", "Subscribe", "Lắng nghe các topic Kafka và xử lý điểm số theo sự kiện")
-    Component(sc3, "Batching Score", "Batch Operation", "Xử lý điểm số theo lô (batch processing)")
+'=== 3. SCORING SERVICE ===
+System_Boundary(scoring, "Scoring Service") {
+    Component(sc2, "Stream Process Score", "Subscribe", "*Lắng nghe các topic Kafka và xử lý điểm số theo sự kiện")
+    Component(sc3, "Batching Score", "Batch Operation", "*Xử lý điểm số theo lô (batch processing)")
+
 }
 
-System_Boundary(crawl, "Crawls Services") {
-}
-Rel(client, c1, "Gọi API lấy dữ liệu")
-Rel(api_router, auth_middleware, "chuyển request đến", "đồng bộ")
-Rel(auth_middleware, service_layer, "gọi đến", "đồng bộ — truyền danh tính người dùng")
-Rel(service_layer, cache_redis, "đọc / ghi dữ liệu", "GET/SET (có thể đọc trực tiếp)")
-Rel(service_layer, repo_postgres, "đọc / ghi dữ liệu", "SELECT/INSERT/UPDATE qua async driver")
-Rel(service_layer, kafka_producer, "gửi sự kiện miền đến", "bất đồng bộ — không chặn luồng chính")
-Rel(kafka_producer, kafka, "gửi sự kiện lên topic")
-Rel(repo_postgres, postgres, "kết nối đến")
-Rel(cache_redis, redis, "kết nối đến", "TCP 6379 — redis-py/aioredis")
-Rel(kafka_producer, background_worker, "đưa vào hàng đợi khi gửi thất bại")
-Rel(background_worker, kafka, "gửi lại sự kiện đã retry", "bất đồng bộ")
+'=== RELATIONSHIPS ===
 
-Rel(sc, cache, "Cập nhật dữ liệu cache (Upsert)")
-Rel(sc, postgres, "Cập nhật kết quả (Upsert)")
-Rel(sc, datalake, "Tải dữ liệu (Load)")
-Rel(sc2, kafka, "Đăng ký nhận sự kiện (Subscribes)")
-Rel(sc2, rabbit, "Sử dụng Dead Letter Queue để xử lý lỗi")
+'--- Scoring flow
+Rel(scoring, datalake, "Tải dữ liệu")
+Rel(sc2, kafka, "Nhận sự kiện (Subscribes)", $tags="Kafka Stuff")
+Rel(sc3, kafka, "Xử lý batch", $tags="Kafka Stuff")
+Rel(scoring, postgres, "Upsert Data", $tags="Database Access")
 
+
+'--- Web API Flow
+Rel_R(client, api_router, "HTTP Request", $tags="External Connect")
+Rel(api_router, auth_middleware, "Xác thực & ủy quyền")
+Rel_R(auth_middleware, service_layer, "Chuyển request hợp lệ")
+Rel(service_layer, cache_redis, "Đọc / Ghi cache", $tags="Cache Access")
+Rel(service_layer, repo_postgres, "Đọc / Ghi DB", $tags="Database Access")
+Rel(service_layer, kafka_producer, "Gửi sự kiện Crawl / Scoring", $tags="Kafka Stuff")
+Rel(service_layer, rabbit_error_pub, "Gửi thông tin lỗi", $tags="Error Queue")
+
+Rel(repo_postgres, postgres, "Kết nối async driver", $tags="Database Access")
+Rel(cache_redis, redis, "", $tags="Cache Access")
+Rel(kafka_producer, kafka, "Publish message", "topic: crawl, score", $tags="Kafka Stuff")
+Rel(rabbit_error_pub, rabbit, "Publish error", $tags="Error Queue")
+
+'--- Crawler flow
+Rel(crawl_consumer, target, "Crawl dữ liệu", $tags="External Connect")
+Rel(kafka, crawl_consumer, "Push Crawl message", $tags="Kafka Stuff")
+Rel_R(crawl_consumer, datalake, "Insert document", "raw documents")
+Rel(crawl_consumer, rabbit, "Publish error", $tags="Error Queue")
+
+Lay_R(web, needed_service)
+Lay_D(needed_service, crawler)
+Lay_U(crawler, needed_service)
+
+SHOW_LEGEND()
 @enduml
+

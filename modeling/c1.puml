@@ -2,10 +2,10 @@
 
 !define C4P ./plantuml/C4-PlantUML
 !include C4P/C4_Deployment.puml
+
 skinparam linetype ortho, polyline
 skinparam defaultTextAlignment center
-skinparam dpi 150
-
+skinparam dpi 240
 
 title Scoring Data System. (System Context C4-L1)
 AddRelTag("external connect", $textColor=$ARROW_FONT_COLOR, $lineColor=$ARROW_COLOR, $lineStyle=DottedLine())
@@ -34,5 +34,5 @@ Rel_D(client, svc, "Gọi API", $tags="external connect" )
 Rel_D(svc, dbs, "Đọc/ghi dữ liệu DB")
 Rel_D(svc, cache, "Cache Data")
 Rel_R(svc, sb2, "Crawl dữ liệu", $tags="external connect")
-LAYOUT_WITH_LEGEND()
+SHOW_LEGEND()
 @enduml
