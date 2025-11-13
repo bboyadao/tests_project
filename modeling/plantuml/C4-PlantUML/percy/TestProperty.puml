@@ -8,6 +8,7 @@
 
 ' default header Property, Value
 AddProperty("Name", "Flash")
+AddProperty("Name1", "Flash1")
 AddProperty("Organization", "Zootopia")
 AddProperty("Tool", "Internet Explorer 7.0")
 Person(personAlias, "Label", "Optional Description (with default property header)")
@@ -20,6 +21,7 @@ Deployment_Node_L(nodeAlias, "Label", "Optional Type", "Optional Description (wi
   WithoutPropertyHeader()
   AddProperty("PropC1", "ValueC1")
   AddProperty("PropC2", "ValueC2")
+  AddProperty("Name1", "Flash1")
   Container(containerAlias, "Label", "Technology", "Optional Description (without property header)")
 }
 
