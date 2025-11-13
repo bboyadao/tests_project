@@ -2,22 +2,59 @@
 !define C4P ./plantuml/C4-PlantUML
 !include C4P/C4_Context.puml
 !include C4P/C4_Component.puml
-'!include C4P/themes/puml-theme-C4_united.puml
+!include C4P/C4_Container.puml
+title Scoring System (C4-L3 Component)
 
-title C3 - Component Diagram: Web-App / API
+System_Boundary(ext, "Message Bus") {
+    System(kafka, "Kafka Cluster", "Hệ thống streaming / pub-sub broker")
+    System(rabbit, "RabbitMq Cluster", "Hàng đợi tin nhắn / pub-sub broker")
+}
 
-Container(webapp, "Web-App API", "FastAPI / Flask", "Cung cấp REST API cho client")
+System_Boundary(dbs, "DataBases") {
+    System(postgres, "PostgreSQL", "Cơ sở dữ liệu quan hệ dùng để lưu trữ dữ liệu lâu dài")
+    System(datalake, "Datalake", "Cơ sở dữ liệu phi quan hệ, lưu trữ dữ liệu thô")
+}
 
-Component(controller, "APIController", "REST Controller", "Xử lý request từ client")
-Component(service, "DataService", "Service", "Logic lấy dữ liệu, cache, DB")
-Component(cacheClient, "Redis Client", "Cache Client", "Đọc / ghi dữ liệu Redis")
-Component(repo, "DataRepository", "PostgreSQL Repository", "Truy vấn / Upsert dữ liệu DB")
-Component(kafkaClient, "KafkaProducer", "Kafka Client", "Gửi lệnh crawl / scoring")
+System_Boundary(cache, "Caches") {
+    System(redis, "Redis", "Bộ nhớ đệm trong RAM, hỗ trợ truy xuất nhanh")
+}
 
-Rel(controller, service, "Gọi logic xử lý dữ liệu")
-Rel(service, cacheClient, "Kiểm tra dữ liệu cache")
-Rel(service, repo, "Truy vấn DB nếu cache trống")
-Rel(service, cacheClient, "Đồng bộ cache sau DB")
-Rel(service, kafkaClient, "Gửi lệnh crawl / scoring")
+Person(client, "Client", "Gọi API Web-App để lấy dữ liệu tổng hợp")
+
+System_Boundary(c1, "Web Services") {
+    Component(api_router, "API Router", "HTTP routing", "Phân tích request HTTP, kiểm tra dữ liệu đầu vào và chuyển tiếp đến middleware hoặc service")
+    Component(auth_middleware, "Auth Middleware", "Authn/Authz", "Xác thực token, trích xuất danh tính và kiểm soát tốc độ truy cập")
+    Component(service_layer, "Service Layer", "Application logic", "Thực thi các use-case, điều phối cache, repository và việc gửi sự kiện")
+    Component(repo_postgres, "PostgreSQL Repository", "Data access layer", "Đọc/ghi dữ liệu vào PostgreSQL thông qua driver bất đồng bộ")
+    Component(cache_redis, "Redis Cache Adapter", "Cache layer", "Cung cấp thao tác get/set, hỗ trợ cơ chế đọc trực tiếp từ cache (read-through)")
+    Component(kafka_producer, "Kafka Producer", "Event publisher", "Gửi sự kiện miền (domain events) lên các topic Kafka một cách bất đồng bộ")
+    Component(background_worker, "Background Worker", "Async worker", "Xử lý lại các lần gửi thất bại, hoặc các tác vụ chạy nền (không đồng bộ)")
+}
+
+System_Boundary(sc, "Scoring Services") {
+    Component(sc1, "Stream Process Score", "HTTP", "Trả kết quả điểm số trực tiếp thông qua HTTP")
+    Component(sc2, "Stream Process Score", "Subscribe", "Lắng nghe các topic Kafka và xử lý điểm số theo sự kiện")
+    Component(sc3, "Batching Score", "Batch Operation", "Xử lý điểm số theo lô (batch processing)")
+}
+
+System_Boundary(crawl, "Crawls Services") {
+}
+Rel(client, c1, "Gọi API lấy dữ liệu")
+Rel(api_router, auth_middleware, "chuyển request đến", "đồng bộ")
+Rel(auth_middleware, service_layer, "gọi đến", "đồng bộ — truyền danh tính người dùng")
+Rel(service_layer, cache_redis, "đọc / ghi dữ liệu", "GET/SET (có thể đọc trực tiếp)")
+Rel(service_layer, repo_postgres, "đọc / ghi dữ liệu", "SELECT/INSERT/UPDATE qua async driver")
+Rel(service_layer, kafka_producer, "gửi sự kiện miền đến", "bất đồng bộ — không chặn luồng chính")
+Rel(kafka_producer, kafka, "gửi sự kiện lên topic")
+Rel(repo_postgres, postgres, "kết nối đến")
+Rel(cache_redis, redis, "kết nối đến", "TCP 6379 — redis-py/aioredis")
+Rel(kafka_producer, background_worker, "đưa vào hàng đợi khi gửi thất bại")
+Rel(background_worker, kafka, "gửi lại sự kiện đã retry", "bất đồng bộ")
+
+Rel(sc, cache, "Cập nhật dữ liệu cache (Upsert)")
+Rel(sc, postgres, "Cập nhật kết quả (Upsert)")
+Rel(sc, datalake, "Tải dữ liệu (Load)")
+Rel(sc2, kafka, "Đăng ký nhận sự kiện (Subscribes)")
+Rel(sc2, rabbit, "Sử dụng Dead Letter Queue để xử lý lỗi")
 
 @enduml
