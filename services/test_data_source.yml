@@ -1,0 +1,6 @@
+services:
+  ds:
+    image: bboyadao/test_data_source:latest
+    container_name: ds
+    ports:
+      - "8000:8000"

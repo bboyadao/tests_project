@@ -1,0 +1,38 @@
+@startuml C1_Context
+
+!define C4P ./plantuml/C4-PlantUML
+!include C4P/C4_Deployment.puml
+
+skinparam linetype ortho, polyline
+skinparam defaultTextAlignment center
+skinparam dpi 240
+
+title Scoring Data System. (System Context C4-L1)
+AddRelTag("external connect", $textColor=$ARROW_FONT_COLOR, $lineColor=$ARROW_COLOR, $lineStyle=DottedLine())
+
+Person(client, "Client", "Truy cập  API Web-App để lấy dữ liệu tổng hợp")
+
+System_Boundary(svc, "Scoring Service") {
+    System(calculate, "Scoring Systems", "*Truy xuất và trả kết quả.\n*Crawls.\n*Tính toán.")
+}
+
+System_Boundary(dbs, "Databases") {
+    System(db, "PostgreSQL", "Lưu trữ kết quả")
+}
+
+System_Boundary(sb2, "External Systems") {
+    System_Ext(ecommerce, "Sàn thương mại điện tử", "Lazada / Tiki")
+    System_Ext(social, "Mạng xã hội", "Facebook / Twitter")
+    System_Ext(bank, "Ngân hàng", "Dữ liệu giao dịch")
+}
+
+System_Boundary(cache, "Cache") {
+    System(redis, "Redis", "Cache dữ liệu")
+}
+
+Rel_D(client, svc, "Gọi API", $tags="external connect" )
+Rel_D(svc, dbs, "Đọc/ghi dữ liệu DB")
+Rel_D(svc, cache, "Cache Data")
+Rel_R(svc, sb2, "Crawl dữ liệu", $tags="external connect")
+SHOW_LEGEND()
+@enduml

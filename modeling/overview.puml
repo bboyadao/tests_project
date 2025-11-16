@@ -1,0 +1,20 @@
+@startuml
+!define C4P ./plantuml/C4-PlantUML
+!include C4P/themes/puml-theme-C4_united.puml
+!include C4P/C4_Deployment.puml
+
+
+!$UseTheme = "C4_united"
+
+Person(admin, "Administrator", "Manages the system")
+System(twitter, "Twitter", "Social media platform")
+
+System_Boundary(c1, "Sample System") {
+    Container(web_app, "Web Application", "C#, ASP.NET Core 2.1 MVC", "Allows users to compare multiple Twitter timelines")
+}
+
+Rel(admin, web_app, "Uses", "HTTPS")
+Rel(web_app, twitter, "Gets tweets from", "HTTPS")
+
+SHOW_FLOATING_LEGEND()
+@enduml

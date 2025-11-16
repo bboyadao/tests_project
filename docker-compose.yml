@@ -1,0 +1,14 @@
+include:
+  - services/redis.yml
+  - services/rabbitmq.yml
+  - services/kafka.yml
+  - services/test_data_source.yml
+  - services/test_producer.yml
+  - services/postgresql.yml
+  - services/mongodb.yml
+  - services/mongodb.yml
+  - services/test_crawler.yml
+
+networks:
+  scoring-network:
+    external: true

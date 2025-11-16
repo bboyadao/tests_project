@@ -1,0 +1,61 @@
+@startuml C2_Container
+!define C4P ./plantuml/C4-PlantUML
+!include C4P/C4_Container.puml
+
+skinparam linetype ortho, polyline
+skinparam defaultTextAlignment center
+skinparam dpi 240
+
+title : Scoring Data System (C4-L2 - Container Diagram)
+AddRelTag("External Connect", $textColor=$ARROW_FONT_COLOR, $lineColor=$ARROW_COLOR, $lineStyle=DottedLine())
+AddRelTag("Error handler error push back", $textColor="Red", $lineColor="Red")
+AddRelTag("Cache Stuff", $textColor="Green", $lineColor="Green")
+AddRelTag("Database Access", $textColor="Orange", $lineColor="Orange")
+AddRelTag("Kafka Stuff", $textColor="Blue", $lineColor="Blue")
+
+Person(client, "Client", "Người dùng hoặc hệ thống gọi API để lấy dữ liệu tổng hợp")
+System_Boundary(dbs, "Databases") {
+        ContainerDb(postgres, "PostgreSQL", "Relational Database", "Lưu kết quả tính toán cuối cùng")
+        ContainerDb(datalake, "DataLake", "MongoDB", "Lưu trữ dữ liệu thô từ Crawlers")
+   }
+System_Boundary(scs, "Scoring System") {
+    Container(web, "Web Service", "FastAPI", "Cung cấp REST API cho Client. Đọc cache/DB, gửi lệnh Crawl hoặc Scoring qua Kafka.")
+    Container(crawler, "Crawlers Service", "Python + Playwright / Scrapy", "Nhận message Crawl, thu thập dữ liệu từ các nguồn ngoài, lưu vào Datalake, gửi lỗi qua RabbitMQ.")
+    Container(scoring, "Scoring Service", "Python", "Lắng nghe Kafka, đọc Datalake, tính toán điểm, lưu kết quả vào PostgreSQL và Redis.")
+}
+
+System_Boundary(eventbus, "Message Bus") {
+    Container(kafka, "Kafka", "Message Broker", "Trung gian gửi message giữa Web-App, Crawler và Scoring")
+    Container(rabbit, "RabbitMQ", "Message Queue", "*Nhận lỗi xử lý từ Consumers \n*Hỗ trợ delayed retry \n*Quy trình như Dead-letter Queue")
+}
+
+System_Boundary(cache, "Caches"){
+    ContainerDb(redis, "Redis", "In-memory Cache", "Cache dữ liệu và kết quả tính toán")
+}
+
+System_Boundary(sb2, "Targeted Sites") {
+    System_Ext(ecommerce, "Sàn TMĐT", "Lazada / Tiki")
+    System_Ext(social, "Mạng xã hội", "Facebook / Twitter")
+    System_Ext(bank, "Ngân hàng", "Cung cấp dữ liệu giao dịch")
+}
+Rel_D(client, web, "Truy vấn", $tags="External Connect")
+Rel(web, postgres, "Truy vấn DB", $tags="Database Access")
+
+"crawler" ...left.....> "sb2": "Thu thập dữ liệu",
+
+Rel(crawler, datalake, "Insert data", $tags="Kafka Stuff")
+Rel(crawler, kafka, "Subscribes", $tags="Kafka Stuff")
+Rel(scoring, kafka, "Subscribes", $tags="Kafka Stuff")
+Rel(web, kafka, "Publish Mesage", $tags="Kafka Stuff")
+Rel(scoring, datalake, "Reads data lake")
+
+Rel(web, redis, "Cache Stuff", $tags="Cache Stuff")
+Rel(crawler, rabbit, "", $tags="Error handler error push back")
+Rel(scoring, rabbit, "", $tags="Error handler error push back")
+Rel(web, rabbit, "", $tags="Error handler error push back")
+
+Rel(scoring, postgres, "Upsert", $tags="Database Access")
+Rel_D(scoring, redis, "Upsert", $tags="Cache Stuff")
+
+SHOW_LEGEND()
+@enduml

@@ -1,0 +1,6 @@
+[submodule "modules/tests_producer"]
+	path = modules/tests_producer
+	url = https://github.com/bboyadao/tests_producer
+[submodule "modules/tests_webapp"]
+	path = modules/tests_webapp
+	url = https://github.com/bboyadao/tests_webapp

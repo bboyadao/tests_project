@@ -1,0 +1,8 @@
+services:
+  producer:
+    image: bboyadao/test_producer:latest
+    container_name: test_producer
+    command: ["uv", "run", "app/main.py"]
+    environment:
+      CRAWL_BASE_URL: http://ds:8000
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
