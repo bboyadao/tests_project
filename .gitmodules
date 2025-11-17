@@ -8,7 +8,7 @@
 	branch = main
 [submodule "modules/tests_data_source"]
 	path = modules/tests_data_source
-	url = https://github.com/bboyadao/tests_data_source.git
+	url = git@github.com:bboyadao/tests_data_source.git
 	branch = main
 [submodule "modules/tests_crawl"]
 	path = modules/tests_crawl
