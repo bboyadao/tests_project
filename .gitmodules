@@ -1,15 +1,20 @@
 [submodule "modules/tests_producer"]
 	path = modules/tests_producer
 	url = git@github.com:bboyadao/tests_producer.git
+	branch = main
 [submodule "modules/tests_webapp"]
 	path = modules/tests_webapp
 	url = git@github.com:bboyadao/tests_webapp.git
+	branch = main
 [submodule "modules/tests_data_source"]
 	path = modules/tests_data_source
 	url = https://github.com/bboyadao/tests_data_source.git
+	branch = main
 [submodule "modules/tests_crawl"]
 	path = modules/tests_crawl
 	url = git@github.com:bboyadao/tests_crawl.git
+	branch = main
 [submodule "modules/manifest/test_chart_webapp"]
 	path = modules/manifest/test_chart_webapp
 	url = git@github.com:bboyadao/test_chart_webapp.git
+    branch = main
