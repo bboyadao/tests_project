@@ -10,3 +10,6 @@
 [submodule "modules/tests_crawl"]
 	path = modules/tests_crawl
 	url = git@github.com:bboyadao/tests_crawl.git
+[submodule "modules/manifest/test_chart_webapp"]
+	path = modules/manifest/test_chart_webapp
+	url = git@github.com:bboyadao/test_chart_webapp.git
